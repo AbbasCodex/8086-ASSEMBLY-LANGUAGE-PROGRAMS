@@ -1,0 +1,90 @@
+ROLE
+You are a senior data engineer + payments domain expert. I'm doing a 2-hour timed
+assessment for an "AI Native Engineer" role. The task is deliberately ambiguous —
+there is no single correct answer. Optimise for clarity of assumptions, auditable
+logic, and honest reporting of uncertainty over cleverness.
+
+THE TASK (verbatim from the brief)
+A payments company's books don't balance at month end. They know every transaction
+their platform processed. They know what the bank says actually arrived. The two
+should match. They don't. Find out why. Show them where the gaps are.
+
+There are no input files. You must generate synthetic test data containing exactly
+these four planted gap types:
+1. A transaction that settled in the FOLLOWING month (timing gap, not a loss).
+2. A ROUNDING difference that is invisible row-by-row and only appears when summed
+   (e.g. per-transaction rounding vs batch-level rounding, or FX conversion).
+3. A DUPLICATE entry present in ONE dataset only (retry / re-submission).
+4. A REFUND with no matching original transaction (orphan refund).
+
+BUILD, IN THIS ORDER
+Step 1 — Assumptions doc (ASSUMPTIONS.md)
+Before writing code, write down every assumption you're making: schema, currency,
+fee handling, settlement lag distribution, month-end cutoff timezone, what counts
+as a "match", how you treat refunds/partial refunds, how you treat settlement
+batches. Number them A1, A2, ... You will cite these in the report. Do not skip
+this step and do not invent assumptions silently later.
+
+Step 2 — Synthetic data generator (seeded, reproducible)
+- Two CSVs/JSONs: platform_transactions and bank_settlements.
+- Columns at minimum: txn_id, customer_id, amount, currency, created_at,
+  status (capture/refund), original_txn_id (for refunds), bank_ref, settled_at,
+  settlement_batch_id, fee, net_amount.
+- Generate ~2,000 transactions over 2 months with a 1–2 day settlement lag.
+- Inject the 4 gap types above PLUS at least 2 "control" anomalies you invent and
+  document (e.g. a settlement in the bank file with no platform record, and an
+  amount mismatch within tolerance).
+- Use a fixed random seed. Print a manifest of exactly which row IDs are planted
+  in which gap category — this is your ground truth for testing.
+
+Step 3 — Reconciliation engine
+- Deterministic matching: exact match on reference IDs first, then fuzzy match on
+  (amount, currency, date window, customer), then classify the residual.
+- Classify every row into exactly one bucket:
+  MATCHED / TIMING_NEXT_MONTH / AMOUNT_MISMATCH / DUPLICATE_PLATFORM /
+  DUPLICATE_BANK / ORPHAN_REFUND / UNMATCHED_PLATFORM / UNMATCHED_BANK.
+- CRITICAL: rounding gaps must NOT be detected row-by-row. Detect them at the
+  batch/aggregate level by comparing sum(platform net) vs sum(bank net) per
+  batch/currency/month, and report the residual as a ROUNDING_DIFFERENCE bucket
+  with the delta in cents. Show why row-level matching misses it.
+- Output three artefacts:
+  (a) reconciliation_report.json — machine readable, one row per classification
+  (b) reconciliation_report.md — human readable: totals in, totals out, the
+      variance, and a per-gap-type breakdown with example row IDs
+  (c) a summary table: platform_total, bank_total, unexplained_delta (should be
+      near-zero AFTER accounting for each named bucket, and you must prove it).
+
+Step 4 — Tests (pytest)
+Write tests that verify:
+- All 4 planted gap types are detected, by asserting on the planted ground-truth IDs.
+- The reconciliation is conservation-correct: platform_total − bank_total ==
+  sum of all explained deltas + rounding residual (assert |residual| < 1 cent).
+- Rounding gap is NOT flagged row-by-row (negative test).
+- Duplicates are caught in both directions.
+- A clean control month produces zero unexplained delta (no false positives).
+Print the test output.
+
+Step 5 — Demo
+- A single command that regenerates data and prints the report (make demo / npm run demo).
+- A minimal Streamlit (or single-page HTML) UI showing the variance waterfall and the
+  gap breakdown, so it can be deployed. Include the deploy command.
+
+Step 6 — Honesty section (PRODUCTION_LIMITS.md)
+In exactly 3 sentences: what this solution would get wrong in production
+(e.g. partial captures, multi-currency FX at settlement time, net-vs-gross fee
+handling, ambiguous duplicates that are actually legitimate split payments).
+
+WORKING RULES
+- Narrate your decisions as you go — the full thread is part of the submission,
+  wrong turns included. Do not backtrack and tidy the transcript.
+- If you hit genuine ambiguity, pick an interpretation, log it as an assumption,
+  and move on. Do not ask me more than 3 clarifying questions total.
+- Prefer boring, readable, auditable code over cleverness. Every bucket must be
+  traceable to a rule and to an assumption ID.
+- Do not claim the books balance unless the arithmetic in Step 3(c) proves it.
+
+DELIVER
+File tree, then each file's full contents, then the run commands, then the test
+output, then the 3-sentence production-limits note.
+
+with making proper folder then inside inde it make proper..///

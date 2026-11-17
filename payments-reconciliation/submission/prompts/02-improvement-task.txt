@@ -1,0 +1,34 @@
+Improve the payments-reconciliation project. Do not change the planted-gap
+design. Work in this order and run pytest after each step.
+
+A. Correctness hardening
+1. Confirm reconcile.py never imports or reads the ground-truth manifest.
+2. Add tests that run the full generate -> reconcile pipeline across 10
+   different seeds and assert every planted gap is found, with zero false
+   positives and unexplained == 0.
+3. Add edge-case tests: empty files, a fully clean dataset (zero findings),
+   a txn that is both duplicate AND settled late (not double-counted),
+   settlement on the month-end boundary (31 Oct matched, 1 Nov timing),
+   weekend/holiday settlement windows, a bank-side duplicate, same ID with
+   different amounts (not an exact duplicate), a refund whose parent exists
+   in a prior month (NOT an orphan), and a partial refund.
+4. Add a test that shuffles row order and asserts identical results.
+5. Print precision/recall vs the manifest in demo.py.
+
+B. Explainability
+6. Every finding gets: category, txn id(s), amount impact, the rule that
+   fired, and a one-line plain-English reason.
+7. Add a confidence field and a "needs human review" flag for ambiguous
+   cases (e.g. same ID with different amounts).
+
+C. UI/report
+8. Add a static export: python export_static.py writes a single self-contained
+   docs/index.html (no server, no external deps) so it can be hosted on
+   GitHub Pages.
+9. In the UI: sortable/filterable findings table, search by txn id, CSV
+   download per category, and the waterfall chart reconciling platform total
+   to bank total step by step.
+
+D. Docs
+10. Update README with run steps, the assumptions list, and a "how detection
+    order works" section. Keep PRODUCTION_LIMITS.md at 3 sentences.
